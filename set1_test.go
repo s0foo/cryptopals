@@ -23,3 +23,23 @@ func TestChallenge2(t *testing.T) {
                 t.Error("Wrong output:", res)
         }
 }
+
+func TestChallenge3(t *testing.T) {
+        m, _ := hex.DecodeString("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
+        var key byte
+        var maxScore float64
+        var res string
+        var score float64
+        var unmasked []byte
+        for k := 0; k < 256; k++ {
+                unmasked = singleXor(m, byte(k))
+                score = scoreText(string(unmasked))
+                if score > maxScore {
+                        maxScore = score
+                        key = byte(k)
+                        res = string(unmasked)
+                }
+        }
+        t.Logf("Key: %c", key)
+        t.Logf("Message: %s", res)
+}
