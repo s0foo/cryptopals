@@ -97,3 +97,11 @@ func singleCharacterXorFinder(masked []byte) ([]byte, byte) {
 
 	return res, key
 }
+
+func repeatingKeyXor(in, key []byte) []byte {
+	out := make([]byte, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[i] ^ key[i%len(key)]
+	}
+	return out
+}
