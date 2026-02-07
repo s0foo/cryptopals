@@ -3,6 +3,9 @@ package cryptopals
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"math"
+	"math/bits"
+	"unicode/utf8"
 )
 
 func hex2Base64(hexString string) (string, error) {
@@ -41,25 +44,23 @@ func letterFrequency(text string) map[rune]float64 {
 	return freq
 }
 
-func englishLetterFrequencies() map[rune]float64 {
-	return map[rune]float64{
-		'a': 0.06517, 'b': 0.01242, 'c': 0.02173, 'd': 0.03492,
-		'e': 0.10414, 'f': 0.01978, 'g': 0.01586, 'h': 0.04928,
-		'i': 0.05580, 'j': 0.00090, 'k': 0.00507, 'l': 0.03314,
-		'm': 0.02021, 'n': 0.05645, 'o': 0.05963, 'p': 0.01376,
-		'q': 0.00086, 'r': 0.04971, 's': 0.05157, 't': 0.07293,
-		'u': 0.02251, 'v': 0.00829, 'w': 0.01712, 'x': 0.00136,
-		'y': 0.01459, 'z': 0.00074, ' ': 0.18288,
+func buildCorpus(text string) map[rune]float64 {
+	c := make(map[rune]float64)
+	for _, char := range text {
+		c[char]++
 	}
+	total := utf8.RuneCountInString(text)
+	for char := range c {
+		c[char] = c[char] / float64(total)
+	}
+	return c
 }
 
-func scoreText(text string) float64 {
+func scoreText(text string, corpus map[rune]float64) float64 {
 	observedFreq := letterFrequency(text)
-	expectedFreq := englishLetterFrequencies()
-
 	score := 0.0
 
-	for char, expected := range expectedFreq {
+	for char, expected := range corpus {
 		observed, exists := observedFreq[char]
 		if !exists {
 			observed = 0.0
@@ -78,7 +79,7 @@ func singleXor(src []byte, key byte) []byte {
 	return output
 }
 
-func singleCharacterXorFinder(masked []byte) ([]byte, byte) {
+func singleCharacterXorFinder(masked []byte, corpus map[rune]float64) ([]byte, byte) {
 	var key byte
 	var maxScore float64
 	var res []byte
@@ -87,7 +88,7 @@ func singleCharacterXorFinder(masked []byte) ([]byte, byte) {
 
 	for k := 0; k < 256; k++ {
 		unmasked = singleXor(masked, byte(k))
-		score = scoreText(string(unmasked))
+		score = scoreText(string(unmasked), corpus)
 		if score > maxScore {
 			maxScore = score
 			key = byte(k)
@@ -104,4 +105,50 @@ func repeatingKeyXor(in, key []byte) []byte {
 		out[i] = in[i] ^ key[i%len(key)]
 	}
 	return out
+}
+
+func hammingDistance(a, b []byte) int {
+	d := 0
+	if len(a) != len(b) {
+		panic("[hammingDistance] Buffers must have the same length.")
+	}
+	for i := 0; i < len(a); i++ {
+		d += bits.OnesCount8(a[i] ^ b[i])
+	}
+	return d
+}
+
+func findKeySize(in []byte) int {
+	var distance float64
+	var keysize int
+	minimalDistance := math.MaxFloat64
+
+	for ks := 2; ks < 40; ks++ {
+		distance = float64(hammingDistance(in[:ks*4], in[ks*4:ks*8])) / float64(ks)
+		if distance < minimalDistance {
+			minimalDistance = distance
+			keysize = ks
+		}
+	}
+
+	return keysize
+}
+
+func findXorKey(in []byte, corpus map[rune]float64) []byte {
+	keysize := findKeySize(in)
+	c := make([]byte, (len(in)+keysize-1)/keysize)
+	key := make([]byte, keysize)
+
+	for i := 0; i < keysize; i++ {
+		for j := 0; j < len(c); j++ {
+			if j*keysize+i >= len(in) {
+				continue
+			}
+			c[j] = in[j*keysize+i]
+		}
+		_, k := singleCharacterXorFinder(c, corpus)
+		key[i] = k
+	}
+
+	return key
 }

@@ -3,6 +3,7 @@ package cryptopals
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"os"
 	"testing"
@@ -27,9 +28,19 @@ func TestChallenge2(t *testing.T) {
 	}
 }
 
+func corpusFromFile(name string) map[rune]float64 {
+	text, err := os.ReadFile(name)
+	if err != nil {
+		panic("failed to read text file")
+	}
+	return buildCorpus(string(text))
+}
+
+var corpus = corpusFromFile("data/alice.txt")
+
 func TestChallenge3(t *testing.T) {
 	m, _ := hex.DecodeString("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
-	res, key := singleCharacterXorFinder(m)
+	res, key := singleCharacterXorFinder(m, corpus)
 	t.Logf("Key: %c", key)
 	t.Logf("Message: %s", string(res))
 }
@@ -51,8 +62,8 @@ func TestChallenge4(t *testing.T) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		masked, _ = hex.DecodeString(scanner.Text())
-		res, _ = singleCharacterXorFinder(masked)
-		score = scoreText(string(res))
+		res, _ = singleCharacterXorFinder(masked, corpus)
+		score = scoreText(string(res), corpus)
 		if score > maxScore {
 			maxScore = score
 			unmasked = res
@@ -70,4 +81,30 @@ I go crazy when I hear a cymbal`)
 	if !bytes.Equal(res, ref) {
 		t.Error("Wrong output:", res)
 	}
+}
+
+func TestChallenge6(t *testing.T) {
+	// Hamming distance test
+	a := []byte("this is a test")
+	b := []byte("wokka wokka!!!")
+	d := hammingDistance(a, b)
+	if d != 37 {
+		t.Error("Wrong Hamming distance:", d)
+	}
+
+	// Challenge 6
+	data, err := os.ReadFile("data/6.txt")
+	if err != nil {
+		t.Logf("Error reading file: %v\n", err)
+		return
+	}
+	rawData, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		t.Log("Error decoding file")
+		return
+	}
+
+	key := findXorKey(rawData, corpus)
+	t.Logf("Key: %s", string(key))
+	t.Log(string(repeatingKeyXor(rawData, key)))
 }
