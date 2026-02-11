@@ -108,3 +108,19 @@ func TestChallenge6(t *testing.T) {
 	t.Logf("Key: %s", string(key))
 	t.Log(string(repeatingKeyXor(rawData, key)))
 }
+
+func TestChallenge7(t *testing.T) {
+	data, err := os.ReadFile("data/7.txt")
+	if err != nil {
+		t.Logf("Error reading file: %v\n", err)
+		return
+	}
+	rawData, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		t.Log("Error decoding file")
+		return
+	}
+	key := []byte("YELLOW SUBMARINE")
+	plain := decryptECB(rawData, key)
+	t.Logf("Plaintext: %s", string(plain))
+}

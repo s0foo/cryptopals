@@ -1,6 +1,7 @@
 package cryptopals
 
 import (
+	"crypto/aes"
 	"encoding/base64"
 	"encoding/hex"
 	"math"
@@ -151,4 +152,22 @@ func findXorKey(in []byte, corpus map[rune]float64) []byte {
 	}
 
 	return key
+}
+
+func decryptECB(in, key []byte) []byte {
+	blockSize := len(key)
+	if len(in)%blockSize != 0 {
+		panic("[decryptECB] cannot decrypt")
+	}
+
+	out := make([]byte, len(in))
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		panic("[decryptECB] cannot create AES cipher")
+	}
+	for i := 0; i < len(in); i += blockSize {
+		c.Decrypt(out[i:i+blockSize], in[i:i+blockSize])
+	}
+
+	return out
 }
