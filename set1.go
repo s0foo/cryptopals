@@ -157,7 +157,7 @@ func findXorKey(in []byte, corpus map[rune]float64) []byte {
 func decryptECB(in, key []byte) []byte {
 	blockSize := len(key)
 	if len(in)%blockSize != 0 {
-		panic("[decryptECB] cannot decrypt")
+		panic("[decryptECB] length not a multiple of block size")
 	}
 
 	out := make([]byte, len(in))
@@ -170,4 +170,19 @@ func decryptECB(in, key []byte) []byte {
 	}
 
 	return out
+}
+
+func detectECB(in []byte, blockSize int) bool {
+	if len(in)%blockSize != 0 {
+		panic("[detectECB] length not a multiple of block size")
+	}
+	repeat := make(map[string]bool)
+	for i := 0; i < len(in); i += blockSize {
+		block := string(in[i : i+blockSize])
+		if _, ok := repeat[block]; ok {
+			return true
+		}
+		repeat[block] = true
+	}
+	return false
 }
