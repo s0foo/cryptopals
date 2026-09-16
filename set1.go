@@ -154,22 +154,25 @@ func findXorKey(in []byte, corpus map[rune]float64) []byte {
 	return key
 }
 
-func decryptECB(in, key []byte) []byte {
-	blockSize := len(key)
+func ecbBlocks(in []byte, blockSize int, op func(dst, src []byte)) []byte {
 	if len(in)%blockSize != 0 {
-		panic("[decryptECB] length not a multiple of block size")
+		panic("[ecbBlocks] length not a multiple of block size")
 	}
 
 	out := make([]byte, len(in))
+	for i := 0; i < len(in); i += blockSize {
+		op(out[i:i+blockSize], in[i:i+blockSize])
+	}
+
+	return out
+}
+
+func decryptECB(in, key []byte) []byte {
 	c, err := aes.NewCipher(key)
 	if err != nil {
 		panic("[decryptECB] cannot create AES cipher")
 	}
-	for i := 0; i < len(in); i += blockSize {
-		c.Decrypt(out[i:i+blockSize], in[i:i+blockSize])
-	}
-
-	return out
+	return ecbBlocks(in, len(key), c.Decrypt)
 }
 
 func detectECB(in []byte, blockSize int) bool {

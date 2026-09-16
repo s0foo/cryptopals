@@ -38,3 +38,51 @@ func TestChallenge10(t *testing.T) {
 	plain := decryptCBC(iv, rawData, key)
 	t.Logf("Plaintext: %s", string(plain))
 }
+
+func TestChallenge11(t *testing.T) {
+	plaintext := bytes.Repeat([]byte("A"), 48)
+	for i := 0; i < 100; i++ {
+		ciphertext, actual := encryptionOracle(plaintext)
+		detected := detectMode(ciphertext)
+		if detected != actual {
+			t.Errorf("Detection mismatch: got %s, want %s", detected, actual)
+		}
+	}
+}
+
+func TestEncryptDecryptCBCRoundTrip(t *testing.T) {
+	key := []byte("YELLOW SUBMARINE")
+	iv := bytes.Repeat([]byte{0}, len(key))
+	plaintext := []byte("Some plaintext that is definitely not a multiple of the block size!")
+
+	ciphertext := encryptCBC(iv, append([]byte{}, plaintext...), key)
+	decrypted := decryptCBC(iv, ciphertext, key)
+
+	expected := pkcs7Padding(append([]byte{}, plaintext...), len(key))
+	if !bytes.Equal(decrypted, expected) {
+		t.Errorf("CBC round trip mismatch: got %q, want %q", decrypted, expected)
+	}
+}
+
+func TestChallenge12(t *testing.T) {
+	expected := "Rollin' in my 5.0\n" +
+		"With my rag-top down so my hair can blow\n" +
+		"The girlies on standby waving just to say hi\n" +
+		"Did you stop? No, I just drove by\n"
+
+	blockSize := discoverBlockSize(ecbOracle12)
+	if blockSize != 16 {
+		t.Fatalf("Wrong block size: %d", blockSize)
+	}
+
+	if !detectECB(ecbOracle12(bytes.Repeat([]byte{'A'}, blockSize*2)), blockSize) {
+		t.Fatal("Oracle does not appear to use ECB")
+	}
+
+	plain := decryptECBByteAtATime(ecbOracle12, blockSize)
+	t.Logf("Plaintext:\n%s", string(plain))
+
+	if string(plain) != expected {
+		t.Error("Recovered plaintext does not match the expected string")
+	}
+}
