@@ -3,6 +3,7 @@ package cryptopals
 import (
 	"bytes"
 	"encoding/base64"
+	"maps"
 	"os"
 	"testing"
 )
@@ -84,5 +85,45 @@ func TestChallenge12(t *testing.T) {
 
 	if string(plain) != expected {
 		t.Error("Recovered plaintext does not match the expected string")
+	}
+}
+
+func TestParseKV(t *testing.T) {
+	got, err := parseKV("foo=bar&baz=qux&zap=zazzle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"foo": "bar", "baz": "qux", "zap": "zazzle"}
+	if !maps.Equal(got, want) {
+		t.Errorf("parseKV mismatch: got %v, want %v", got, want)
+	}
+}
+
+func TestProfileForStripsMetacharacters(t *testing.T) {
+	got := profileFor("foo@bar.com&role=admin")
+	want := "email=foo@bar.comroleadmin&uid=10&role=user"
+	if got != want {
+		t.Errorf("profileFor mismatch: got %q, want %q", got, want)
+	}
+}
+
+func TestProfileRoundTrip(t *testing.T) {
+	profile, err := decryptProfile(encryptProfile("foo@bar.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile["email"] != "foo@bar.com" || profile["uid"] != "10" || profile["role"] != "user" {
+		t.Errorf("Unexpected profile: %v", profile)
+	}
+}
+
+func TestChallenge13(t *testing.T) {
+	profile, err := decryptProfile(forgeAdminProfile())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Forged profile: %v", profile)
+	if profile["role"] != "admin" {
+		t.Errorf("Forged profile is not admin: %v", profile)
 	}
 }

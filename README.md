@@ -21,13 +21,14 @@ Go solutions to the [Cryptopals Crypto Challenges](https://cryptopals.com/).
 - [x] 10. Implement CBC mode
 - [x] 11. An ECB/CBC detection oracle
 - [x] 12. Byte-at-a-time ECB decryption (Simple)
-- [ ] 13+
+- [x] 13. ECB cut-and-paste
+- [ ] 14+
 
 ## Structure
 
 ```
 set1.go / set1_test.go   Challenges 1-8
-set2.go / set2_test.go   Challenges 9-12
+set2.go / set2_test.go   Challenges 9-13
 data/                    Challenge inputs (and alice.txt, used as a
                           letter-frequency corpus for XOR scoring)
 ```

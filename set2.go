@@ -5,7 +5,9 @@ import (
 	"crypto/aes"
 	crand "crypto/rand"
 	"encoding/base64"
+	"errors"
 	mrand "math/rand"
+	"strings"
 )
 
 func pkcs7Padding(in []byte, blockSize int) []byte {
@@ -155,4 +157,81 @@ func decryptECBByteAtATime(oracle func([]byte) []byte, blockSize int) []byte {
 	}
 
 	return known
+}
+
+// pkcs7Unpad strips PKCS#7 padding, rejecting input whose padding is
+// malformed.
+func pkcs7Unpad(in []byte, blockSize int) ([]byte, error) {
+	if len(in) == 0 || len(in)%blockSize != 0 {
+		return nil, errors.New("[pkcs7Unpad] input is not a multiple of the block size")
+	}
+	padLen := int(in[len(in)-1])
+	if padLen == 0 || padLen > blockSize {
+		return nil, errors.New("[pkcs7Unpad] invalid padding length")
+	}
+	if !bytes.Equal(in[len(in)-padLen:], bytes.Repeat([]byte{byte(padLen)}, padLen)) {
+		return nil, errors.New("[pkcs7Unpad] invalid padding bytes")
+	}
+	return in[:len(in)-padLen], nil
+}
+
+// parseKV parses a "foo=bar&baz=qux" string into a map.
+func parseKV(s string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, pair := range strings.Split(s, "&") {
+		k, v, ok := strings.Cut(pair, "=")
+		if !ok {
+			return nil, errors.New("[parseKV] malformed pair: " + pair)
+		}
+		out[k] = v
+	}
+	return out, nil
+}
+
+// profileFor encodes a user profile for email. Metacharacters are stripped
+// so the caller cannot inject their own "&role=admin".
+func profileFor(email string) string {
+	email = strings.NewReplacer("&", "", "=", "").Replace(email)
+	return "email=" + email + "&uid=10&role=user"
+}
+
+var profileKey = randomBytes(16)
+
+func encryptProfile(email string) []byte {
+	return encryptECB(pkcs7Padding([]byte(profileFor(email)), 16), profileKey)
+}
+
+func decryptProfile(ciphertext []byte) (map[string]string, error) {
+	plain, err := pkcs7Unpad(decryptECB(ciphertext, profileKey), 16)
+	if err != nil {
+		return nil, err
+	}
+	return parseKV(string(plain))
+}
+
+// forgeAdminProfile builds a ciphertext that decrypts to a role=admin
+// profile using only calls to encryptProfile, by cutting and pasting ECB
+// blocks from two different encryptions.
+func forgeAdminProfile() []byte {
+	const bs = 16
+	prefix := "email="
+	fill := strings.Repeat("A", bs-len(prefix))
+
+	// Block 1 of this encryption is exactly "admin" + PKCS#7 padding,
+	// i.e. what a final "admin" block looks like.
+	adminBlock := pkcs7Padding([]byte("admin"), bs)
+	adminCipher := encryptProfile(fill + string(adminBlock))[bs : 2*bs]
+
+	// Choose an email length so that "email=...&uid=10&role=" ends on a
+	// block boundary, leaving "user" + padding alone in the last block.
+	head := len(prefix) + len("&uid=10&role=")
+	emailLen := bs - head%bs
+	if emailLen < len("@x.io") {
+		emailLen += bs
+	}
+	email := strings.Repeat("a", emailLen-len("@x.io")) + "@x.io"
+	userCipher := encryptProfile(email)
+
+	cut := len(userCipher) - bs
+	return append(append([]byte{}, userCipher[:cut]...), adminCipher...)
 }
